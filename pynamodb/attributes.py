@@ -31,10 +31,8 @@ class Attribute(object):
                  hash_key=False,
                  range_key=False,
                  null=None,
-                 default=None,
                  attr_name=None
                  ):
-        self.default = default
         if null is not None:
             self.null = null
         self.is_hash_key = hash_key
@@ -219,7 +217,6 @@ class AttributeContainer(object):
         # instances do not have any Attributes defined and instead use this dictionary to store their
         # collection of name-value pairs.
         self.attribute_values = {}
-        self._set_defaults()
         self._set_attributes(**attributes)
 
     @classmethod
@@ -249,19 +246,6 @@ class AttributeContainer(object):
         This covers cases where an attribute name has been overridden via "attr_name".
         """
         return cls._dynamo_to_python_attrs.get(dynamo_key, dynamo_key)
-
-    def _set_defaults(self):
-        """
-        Sets and fields that provide a default value
-        """
-        for name, attr in self.get_attributes().items():
-            default = attr.default
-            if callable(default):
-                value = default()
-            else:
-                value = default
-            if value is not None:
-                setattr(self, name, value)
 
     def _set_attributes(self, **attributes):
         """
@@ -885,11 +869,10 @@ class ListAttribute(Attribute):
     attr_type = LIST
     element_type = None
 
-    def __init__(self, hash_key=False, range_key=False, null=None, default=None, attr_name=None, of=None):
+    def __init__(self, hash_key=False, range_key=False, null=None, attr_name=None, of=None):
         super(ListAttribute, self).__init__(hash_key=hash_key,
                                             range_key=range_key,
                                             null=null,
-                                            default=default,
                                             attr_name=attr_name)
         if of:
             if not issubclass(of, MapAttribute):

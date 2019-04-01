@@ -132,17 +132,6 @@ class TestUTCDateTimeAttribute:
     """
     Tests UTCDateTime attributes
     """
-    def test_utc_datetime_attribute(self):
-        """
-        UTCDateTimeAttribute.default
-        """
-        attr = UTCDateTimeAttribute()
-        assert attr is not None
-        assert attr.attr_type == STRING
-        tstamp = datetime.now()
-        attr = UTCDateTimeAttribute(default=tstamp)
-        assert attr.default == tstamp
-
     def test_utc_date_time_deserialize(self):
         """
         UTCDateTimeAttribute.deserialize
@@ -187,17 +176,6 @@ class TestBinaryAttribute:
     """
     Tests binary attributes
     """
-    def test_binary_attribute(self):
-        """
-        BinaryAttribute.default
-        """
-        attr = BinaryAttribute()
-        assert attr is not None
-        assert attr.attr_type == BINARY
-
-        attr = BinaryAttribute(default=b'foo')
-        assert attr.default == b'foo'
-
     def test_binary_round_trip(self):
         """
         BinaryAttribute round trip
@@ -253,32 +231,11 @@ class TestBinaryAttribute:
             [b64encode(val).decode(DEFAULT_ENCODING) for val in sorted(value)]
         ) == value
 
-    def test_binary_set_attribute(self):
-        """
-        BinarySetAttribute.serialize
-        """
-        attr = BinarySetAttribute()
-        assert attr is not None
-
-        attr = BinarySetAttribute(default=set([b'foo', b'bar']))
-        assert attr.default == set([b'foo', b'bar'])
-
 
 class TestNumberAttribute:
     """
     Tests number attributes
     """
-    def test_number_attribute(self):
-        """
-        NumberAttribute.default
-        """
-        attr = NumberAttribute()
-        assert attr is not None
-        assert attr.attr_type == NUMBER
-
-        attr = NumberAttribute(default=1)
-        assert attr.default == 1
-
     def test_number_serialize(self):
         """
         NumberAttribute.serialize
@@ -313,32 +270,11 @@ class TestNumberAttribute:
         assert attr.serialize(set([1, 2])) == [json.dumps(val) for val in sorted(set([1, 2]))]
         assert attr.serialize(None) is None
 
-    def test_number_set_attribute(self):
-        """
-        NumberSetAttribute.default
-        """
-        attr = NumberSetAttribute()
-        assert attr is not None
-
-        attr = NumberSetAttribute(default=set([1, 2]))
-        assert attr.default == set([1, 2])
-
 
 class TestUnicodeAttribute:
     """
     Tests unicode attributes
     """
-    def test_unicode_attribute(self):
-        """
-        UnicodeAttribute.default
-        """
-        attr = UnicodeAttribute()
-        assert attr is not None
-        assert attr.attr_type == STRING
-
-        attr = UnicodeAttribute(default=six.u('foo'))
-        assert attr.default == six.u('foo')
-
     def test_unicode_serialize(self):
         """
         UnicodeAttribute.serialize
@@ -408,16 +344,6 @@ class TestUnicodeAttribute:
         value = set([six.u('1'), six.u('2.8')])
         assert attr.deserialize(value) == value
 
-    def test_unicode_set_attribute(self):
-        """
-        UnicodeSetAttribute.default
-        """
-        attr = UnicodeSetAttribute()
-        assert attr is not None
-        assert attr.attr_type == STRING_SET
-        attr = UnicodeSetAttribute(default=set([six.u('foo'), six.u('bar')]))
-        assert attr.default == set([six.u('foo'), six.u('bar')])
-
 
 class TestLegacyBooleanAttribute:
     def test_legacy_boolean_attribute_can_read_future_boolean_attributes(self):
@@ -463,17 +389,6 @@ class TestBooleanAttribute:
     """
     Tests boolean attributes
     """
-    def test_boolean_attribute(self):
-        """
-        BooleanAttribute.default
-        """
-        attr = BooleanAttribute()
-        assert attr is not None
-
-        assert attr.attr_type == BOOLEAN
-        attr = BooleanAttribute(default=True)
-        assert attr.default is True
-
     def test_boolean_serialize(self):
         """
         BooleanAttribute.serialize
@@ -505,17 +420,6 @@ class TestJSONAttribute:
 
         serialized = attr.serialize('"')
         assert attr.deserialize(serialized) == '"'
-
-    def test_json_attribute(self):
-        """
-        JSONAttribute.default
-        """
-        attr = JSONAttribute()
-        assert attr is not None
-
-        assert attr.attr_type == STRING
-        attr = JSONAttribute(default={})
-        assert attr.default == {}
 
     def test_json_serialize(self):
         """
