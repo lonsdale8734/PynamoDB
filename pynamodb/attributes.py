@@ -161,9 +161,13 @@ class Attribute(object):
         return Path(self).prepend(other)
 
     def set(self, value):
+        if not self.null and value is None:
+            raise ValueError('{} cannot be None'.format(self.attr_name))
         return Path(self).set(value)
 
     def remove(self):
+        if not self.null:
+            raise ValueError('{} cannot be None'.format(self.attr_name))
         return Path(self).remove()
 
     def add(self, *values):
