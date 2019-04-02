@@ -190,7 +190,7 @@ class Value(_NumericOperand, _ListAppendOperand, _ConditionOperand):
         # Check to see if value is already serialized
         if isinstance(value, dict) and len(value) == 1 and list(value.keys())[0] in SHORT_ATTR_TYPES:
             (self.short_attr_type, value), = value.items()
-        elif value is None:
+        elif value is None or value == '':
             (self.short_attr_type, value) = Value.__serialize(value)
         else:
             (self.short_attr_type, value) = Value.__serialize(value, attribute)
