@@ -6,7 +6,7 @@ from six import add_metaclass
 import json
 from base64 import b64encode, b64decode
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import warnings
 from dateutil.parser import parse
 from dateutil.tz import tzutc
@@ -430,7 +430,7 @@ class JSONAttribute(Attribute):
         """
         if value is None:
             return None
-        encoded = json.dumps(value)
+        encoded = json.dumps(value, ensure_ascii=False)
         try:
             return unicode(encoded)
         except NameError:
@@ -534,6 +534,18 @@ class UTCDateTimeAttribute(Attribute):
     An attribute for storing a UTC Datetime
     """
     attr_type = STRING
+
+    def __init__(self,
+                 hash_key=False,
+                 range_key=False,
+                 null=None,
+                 attr_name=None
+                 ):
+        super(UTCDateTimeAttribute, self).__init__(hash_key=hash_key,
+                                                   range_key=range_key,
+                                                   null=null,
+                                                   attr_name=attr_name)
+        warnings.warn("`UTCDateTimeAttribute` is deprecated in favour of `DateTimeAttribute` now")
 
     def serialize(self, value):
         """
@@ -925,6 +937,109 @@ class ListAttribute(Attribute):
             attr_value = _get_value_for_deserialize(v)
             deserialized_lst.append(class_for_deserialize.deserialize(attr_value))
         return deserialized_lst
+
+
+class EnumAttribute(UnicodeAttribute):
+    enum = None
+
+    def __init__(self, of, hash_key=False, range_key=False, null=None, attr_name=None):
+        super(EnumAttribute, self).__init__(hash_key=hash_key,
+                                            range_key=range_key,
+                                            null=null,
+                                            attr_name=attr_name)
+        from enum import Enum
+
+        if not issubclass(of, Enum):
+            raise ValueError("'of' must be subclass of Enum")
+        self.enum: Type[Enum] = of
+
+    def serialize(self, value):
+        if not isinstance(value, self.enum):
+            raise ValueError('{} must be instance of {}, not "{}"'.format(self.attr_name, self.enum, value))
+
+        return super(EnumAttribute, self).serialize(value.value)
+
+    def deserialize(self, value):
+        if value is None:
+            return None
+        value = super(EnumAttribute, self).deserialize(value)
+        return self.enum(value)
+
+
+class DatetimeAttribute(Attribute):
+    attr_type = STRING
+    format = '%Y-%m-%d %H:%M:%S.%f'
+    _tz_utc8 = timezone(timedelta(hours=8))
+    tz_info = None
+
+    def __init__(self, tz_info=None, hash_key=False, range_key=False, null=None, attr_name=None):
+        super(DatetimeAttribute, self).__init__(hash_key=hash_key,
+                                                range_key=range_key,
+                                                null=null,
+                                                attr_name=attr_name)
+        self.tz_info = tz_info or DatetimeAttribute._tz_utc8
+
+    def serialize(self, value):
+        if not isinstance(value, datetime):
+            raise ValueError('{} must be {}'.format(self.attr_name, datetime.__name__))
+
+        if value.tzinfo != self.tz_info:
+            raise ValueError('timezone of {} must be {}'.format(self.attr_name, self.tz_info))
+
+        fmt = value.strftime(self.format)
+        return six.u(fmt)
+
+    def deserialize(self, value):
+        return datetime.strptime(value, self.format).replace(tzinfo=self.tz_info)
+
+
+class DateAttribute(DatetimeAttribute):
+    format = '%Y%m%d'
+
+
+class CompositeAttribute(Attribute):
+    attr_type = STRING
+    element_type = None
+    separator = None
+
+    def __init__(self, of, separator='|', hash_key=False,
+                 range_key=False, null=None, attr_name=None):
+        super(CompositeAttribute, self).__init__(hash_key=hash_key,
+                                                 range_key=range_key,
+                                                 null=null,
+                                                 attr_name=attr_name)
+        for item in of:
+            if not isinstance(item, Attribute) or item.attr_type != STRING:
+                raise ValueError('{} must be instance of String Attribute)'.format(item))
+        self.element_type = of
+        self.separator = separator
+
+    def serialize(self, value):
+        assert len(value) == len(self.element_type)
+        values = []
+        for attr, data in zip(self.element_type, value):
+            if data is None and attr.null:
+                tmp = None
+            else:
+                tmp = attr.serialize(data)
+                
+            if tmp is None:
+                tmp = ''  # one-to-one correspondence
+            values.append(tmp)
+        return self.separator.join(values)
+
+    def deserialize(self, value):
+        values = value.split(self.separator)
+        
+        elements = []
+        for attr, data in zip(self.element_type, values):
+            if data == '' and attr.null:
+                elements.append(None)
+            else:
+                elements.append(attr.deserialize(data))
+                
+        return tuple(elements)
+
 
 DESERIALIZE_CLASS_MAP = {
     LIST_SHORT: ListAttribute(),

@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, Generic, Iterable, List, Mapping, Optional, Text, Type, TypeVar, Union, Set, overload
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pynamodb.expressions.condition import (
     BeginsWith, Between, Comparison, Contains, NotExists, Exists, In
@@ -120,6 +120,7 @@ class NumberAttribute(Attribute[float]):
 
 
 class UTCDateTimeAttribute(Attribute[datetime]):
+    def __init__(self, hash_key: bool = ..., range_key: bool = ..., null: Optional[bool] = ..., attr_name: Optional[Text] = ...) -> None: ...
     @overload
     def __get__(self: _A, instance: None, owner: Any) -> _A: ...
     @overload
@@ -156,6 +157,35 @@ class ListAttribute(Generic[_T], Attribute[List[_T]]):
     def __get__(self: _A, instance: None, owner: Any) -> _A: ...
     @overload
     def __get__(self, instance: Any, owner: Any) -> List[_T]: ...
+
+class EnumAttribute(UnicodeAttribute):
+    from enum import Enum
+    enum: Enum
+    def __init__(self, of: Enum, hash_key: bool = ..., range_key: bool = ..., null: Optional[bool] = ..., attr_name: Optional[Text] = ...) -> None: ...
+    @overload
+    def __get__(self: _A, instance: None, owner: Any) -> _A: ...
+    @overload
+    def __get__(self, instance: Any, owner: Any) -> Text: ...
+
+class DatetimeAttribute(Attribute[datetime]):
+    tz_info: timezone
+    def __init__(self, tz_info: timezone = ..., hash_key: bool = ..., range_key: bool = ..., null: Optional[bool] = ..., attr_name: Optional[Text] = ...) -> None: ...
+    @overload
+    def __get__(self: _A, instance: None, owner: Any) -> _A: ...
+    @overload
+    def __get__(self, instance: Any, owner: Any) -> datetime: ...
+
+class DateAttribute(DatetimeAttribute):
+    pass
+
+class CompositeAttribute(Attribute):
+    element_type: Iterable[Attribute]
+    separator: Text
+    def __init__(self, of: Iterable[Attribute], separator: Text = ..., hash_key: bool = ..., range_key: bool = ..., null: Optional[bool] = ..., attr_name: Optional[Text] = ...) -> None: ...
+    @overload
+    def __get__(self: _A, instance: None, owner: Any) -> _A: ...
+    @overload
+    def __get__(self, instance: Any, owner: Any) -> Iterable[Attribute]: ...
 
 DESERIALIZE_CLASS_MAP: Dict[Text, Attribute]
 SERIALIZE_CLASS_MAP: Dict[Type, Attribute]
