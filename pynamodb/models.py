@@ -258,11 +258,6 @@ class Model(AttributeContainer):
         return False
 
     @classmethod
-    def _conditional_operator_check(cls, conditional_operator):
-        if conditional_operator is not None and cls.has_map_or_list_attributes():
-            raise NotImplementedError('Map and List attribute do not support conditional_operator yet')
-
-    @classmethod
     def batch_get(cls, items, consistent_read=None, attributes_to_get=None):
         """
         BatchGetItem for this model
@@ -336,111 +331,28 @@ class Model(AttributeContainer):
                 msg = "{0}<{1}>".format(self.Meta.table_name, serialized.get(HASH))
             return six.u(msg)
 
-    def delete(self, condition=None, conditional_operator=None, **expected_values):
+    def delete(self, condition=None):
         """
         Deletes this object from dynamodb
         """
-        self._conditional_operator_check(conditional_operator)
         args, kwargs = self._get_save_args(attributes=False, null_check=False)
-        if len(expected_values):
-            kwargs.update(expected=self._build_expected_values(expected_values, DELETE_FILTER_OPERATOR_MAP))
-        kwargs.update(conditional_operator=conditional_operator)
         kwargs.update(condition=condition)
         return self._get_connection().delete_item(*args, **kwargs)
 
-    def update_item(self, attribute, value=None, action=None, condition=None, conditional_operator=None, **expected_values):
+    def update(self, actions=None, condition=None):
         """
         Updates an item using the UpdateItem operation.
-
-        This should be used for updating a single attribute of an item.
-
-        :param attribute: The name of the attribute to be updated
-        :param value: The new value for the attribute.
-        :param action: The action to take if this item already exists.
-            See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html#DDB-UpdateItem-request-AttributeUpdate
         """
-        warnings.warn("`Model.update_item` is deprecated in favour of `Model.update` now")
-
-        self._conditional_operator_check(conditional_operator)
-        args, save_kwargs = self._get_save_args(null_check=False)
-        attribute_cls = None
-        for attr_name, attr_cls in self.get_attributes().items():
-            if attr_name == attribute:
-                attribute_cls = attr_cls
-                break
-        if not attribute_cls:
-            raise ValueError("Attribute {0} specified does not exist".format(attr_name))
-        if save_kwargs.get(pythonic(RANGE_KEY)):
-            kwargs = {pythonic(RANGE_KEY): save_kwargs.get(pythonic(RANGE_KEY))}
-        else:
-            kwargs = {}
-        if len(expected_values):
-            kwargs.update(expected=self._build_expected_values(expected_values, UPDATE_FILTER_OPERATOR_MAP))
-        kwargs[pythonic(ATTR_UPDATES)] = {
-            attribute_cls.attr_name: {
-                ACTION: action.upper() if action else None,
-            }
-        }
-        if value is not None:
-            kwargs[pythonic(ATTR_UPDATES)][attribute_cls.attr_name][VALUE] = {
-                ATTR_TYPE_MAP[attribute_cls.attr_type]: attribute_cls.serialize(value)
-            }
-        kwargs[pythonic(RETURN_VALUES)] = ALL_NEW
-        kwargs.update(conditional_operator=conditional_operator)
-        kwargs.update(condition=condition)
-        data = self._get_connection().update_item(
-            *args,
-            **kwargs
-        )
-
-        for name, value in data.get(ATTRIBUTES).items():
-            attr_name = self._dynamo_to_python_attr(name)
-            attr = self.get_attributes().get(attr_name)
-            if attr:
-                setattr(self, attr_name, attr.deserialize(attr.get_value(value)))
-        return data
-
-    def update(self, attributes=None, actions=None, condition=None, conditional_operator=None, **expected_values):
-        """
-        Updates an item using the UpdateItem operation.
-
-        :param attributes: A dictionary of attributes to update in the following format
-                            {
-                                attr_name: {'value': 10, 'action': 'ADD'},
-                                next_attr: {'value': True, 'action': 'PUT'},
-                            }
-        """
-        if attributes is not None and not isinstance(attributes, dict):
-            raise TypeError("the value of `attributes` is expected to be a dictionary")
         if actions is not None and not isinstance(actions, list):
             raise TypeError("the value of `actions` is expected to be a list")
 
-        self._conditional_operator_check(conditional_operator)
         args, save_kwargs = self._get_save_args(null_check=False)
         kwargs = {
             pythonic(RETURN_VALUES):  ALL_NEW,
-            'conditional_operator': conditional_operator,
         }
-
-        if attributes:
-            kwargs[pythonic(ATTR_UPDATES)] = {}
 
         if pythonic(RANGE_KEY) in save_kwargs:
             kwargs[pythonic(RANGE_KEY)] = save_kwargs[pythonic(RANGE_KEY)]
-
-        if expected_values:
-            kwargs['expected'] = self._build_expected_values(expected_values, UPDATE_FILTER_OPERATOR_MAP)
-
-        attrs = self.get_attributes()
-        attributes = attributes or {}
-        for attr, params in attributes.items():
-            attribute_cls = attrs[attr]
-            action = params['action'] and params['action'].upper()
-            attr_values = {ACTION: action}
-            if 'value' in params:
-                attr_values[VALUE] = self._serialize_value(attribute_cls, params['value'])
-
-            kwargs[pythonic(ATTR_UPDATES)][attribute_cls.attr_name] = attr_values
 
         kwargs.update(condition=condition)
         kwargs.update(actions=actions)
@@ -452,15 +364,11 @@ class Model(AttributeContainer):
                 setattr(self, attr_name, attr.deserialize(attr.get_value(value)))
         return data
 
-    def save(self, condition=None, conditional_operator=None, **expected_values):
+    def save(self, condition=None):
         """
         Save this object to dynamodb
         """
-        self._conditional_operator_check(conditional_operator)
         args, kwargs = self._get_save_args()
-        if len(expected_values):
-            kwargs.update(expected=self._build_expected_values(expected_values, PUT_FILTER_OPERATOR_MAP))
-        kwargs.update(conditional_operator=conditional_operator)
         kwargs.update(condition=condition)
         return self._get_connection().put_item(*args, **kwargs)
 
@@ -616,7 +524,6 @@ class Model(AttributeContainer):
               consistent_read=False,
               index_name=None,
               scan_index_forward=None,
-              conditional_operator=None,
               limit=None,
               last_evaluated_key=None,
               attributes_to_get=None,
@@ -634,13 +541,11 @@ class Model(AttributeContainer):
         :param limit: Used to limit the number of results returned
         :param scan_index_forward: If set, then used to specify the same parameter to the DynamoDB API.
             Controls descending or ascending results
-        :param conditional_operator:
         :param last_evaluated_key: If set, provides the starting point for query.
         :param attributes_to_get: If set, only returns these elements
         :param page_size: Page size of the query to DynamoDB
         :param filters: A dictionary of filters to be used in the query
         """
-        cls._conditional_operator_check(conditional_operator)
         cls._get_indexes()
         if index_name:
             hash_key = cls._index_classes[index_name]._hash_key_attribute().serialize(hash_key)
@@ -677,8 +582,7 @@ class Model(AttributeContainer):
             limit=page_size,
             key_conditions=key_conditions,
             attributes_to_get=attributes_to_get,
-            query_filters=query_filters,
-            conditional_operator=conditional_operator
+            query_filters=query_filters
         )
 
         return ResultIterator(
@@ -697,7 +601,6 @@ class Model(AttributeContainer):
             segment=None,
             total_segments=None,
             limit=None,
-            conditional_operator=None,
             last_evaluated_key=None,
             page_size=None,
             timeout_seconds=None,
@@ -717,7 +620,6 @@ class Model(AttributeContainer):
         :param segment: If set, then scans the segment
         :param total_segments: If set, then specifies total segments
         :param limit: Used to limit the number of results returned
-        :param conditional_operator:
         :param last_evaluated_key: If set, provides the starting point for scan.
         :param page_size: Page size of the scan to DynamoDB
         :param filters: A list of item filters
@@ -734,7 +636,6 @@ class Model(AttributeContainer):
         :param consistent_read: If True, a consistent read is performed
         """
 
-        cls._conditional_operator_check(conditional_operator)
         key_filter, scan_filter = cls._build_filters(
             SCAN_OPERATOR_MAP,
             non_key_operator_map=SCAN_OPERATOR_MAP,
@@ -748,7 +649,6 @@ class Model(AttributeContainer):
             attributes_to_get=attributes_to_get,
             page_size=page_size,
             limit=limit,
-            conditional_operator=conditional_operator,
             scan_filter=key_filter,
             segment=segment,
             total_segments=total_segments,
@@ -771,7 +671,6 @@ class Model(AttributeContainer):
              segment=None,
              total_segments=None,
              limit=None,
-             conditional_operator=None,
              last_evaluated_key=None,
              page_size=None,
              consistent_read=None,
@@ -785,13 +684,11 @@ class Model(AttributeContainer):
         :param segment: If set, then scans the segment
         :param total_segments: If set, then specifies total segments
         :param limit: Used to limit the number of results returned
-        :param conditional_operator:
         :param last_evaluated_key: If set, provides the starting point for scan.
         :param page_size: Page size of the scan to DynamoDB
         :param filters: A list of item filters
         :param consistent_read: If True, a consistent read is performed
         """
-        cls._conditional_operator_check(conditional_operator)
         key_filter, scan_filter = cls._build_filters(
             SCAN_OPERATOR_MAP,
             non_key_operator_map=SCAN_OPERATOR_MAP,
@@ -811,7 +708,6 @@ class Model(AttributeContainer):
             limit=page_size,
             scan_filter=key_filter,
             total_segments=total_segments,
-            conditional_operator=conditional_operator,
             consistent_read=consistent_read,
             index_name=index_name
         )
@@ -956,74 +852,6 @@ class Model(AttributeContainer):
         item = cls()
         item._deserialize(attributes)
         return item
-
-    @classmethod
-    def _build_expected_values(cls, expected_values, operator_map=None):
-        """
-        Builds an appropriate expected value map
-
-        :param expected_values: A list of expected values
-        """
-        expected_values_result = {}
-        attributes = cls.get_attributes()
-        filters = {}
-        for attr_name, attr_value in expected_values.items():
-            attr_cond = VALUE
-            if attr_name.endswith("__exists"):
-                attr_cond = EXISTS
-                attr_name = attr_name[:-8]
-            attr_cls = attributes.get(attr_name, None)
-            if attr_cls is None:
-                filters[attr_name] = attr_value
-            else:
-                if attr_cond == VALUE:
-                    attr_value = attr_cls.serialize(attr_value)
-                expected_values_result[attr_cls.attr_name] = {
-                    attr_cond: attr_value
-                }
-        for cond, value in filters.items():
-            attribute = None
-            attribute_class = None
-            for token in cond.split('__'):
-                if attribute is None:
-                    attribute = token
-                    attribute_class = attributes.get(attribute)
-                    if attribute_class is None:
-                        raise ValueError("Attribute {0} specified for expected value does not exist".format(attribute))
-                elif token in operator_map:
-                    operator = operator_map.get(token)
-                    if operator == NULL:
-                        if value:
-                            value = NULL
-                        else:
-                            value = NOT_NULL
-                        condition = {
-                            COMPARISON_OPERATOR: value,
-                        }
-                    elif operator == EQ or operator == NE:
-                        condition = {
-                            COMPARISON_OPERATOR: operator,
-                            ATTR_VALUE_LIST: [{
-                                ATTR_TYPE_MAP[attribute_class.attr_type]:
-                                attribute_class.serialize(value)
-                            }]
-                        }
-                    else:
-                        if not isinstance(value, list):
-                            value = [value]
-                        condition = {
-                            COMPARISON_OPERATOR: operator,
-                            ATTR_VALUE_LIST: [
-                                {
-                                    ATTR_TYPE_MAP[attribute_class.attr_type]:
-                                    attribute_class.serialize(val)
-                                } for val in value
-                            ]
-                        }
-                    expected_values_result[attributes.get(attribute).attr_name] = condition
-                else:
-                    raise ValueError("Could not parse expected condition: {0}".format(cond))
-        return expected_values_result
 
     @classmethod
     def _tokenize_filters(cls, filters):
