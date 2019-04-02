@@ -409,7 +409,6 @@ class Model(AttributeContainer):
             item_data = data.get(ITEM)
             if item_data:
                 return cls.from_raw_data(item_data)
-        raise cls.DoesNotExist()
 
     @classmethod
     def from_raw_data(cls, data):
