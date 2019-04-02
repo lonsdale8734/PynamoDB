@@ -24,7 +24,7 @@ from pynamodb.constants import (
     KEY_TYPE, ITEM, ITEMS, BILLING_MODE, PAY_PER_REQUEST,
     READ_CAPACITY_UNITS, WRITE_CAPACITY_UNITS, CAMEL_COUNT,
     RANGE_KEY, ATTRIBUTES, PUT, DELETE, RESPONSES, QUERY_FILTER_OPERATOR_MAP,
-    INDEX_NAME, PROVISIONED_THROUGHPUT, PROJECTION, ATTR_UPDATES, ALL_NEW,
+    INDEX_NAME, PROVISIONED_THROUGHPUT, PROJECTION, ATTR_UPDATES, ALL_NEW, ALL_OLD,
     GLOBAL_SECONDARY_INDEXES, LOCAL_SECONDARY_INDEXES, ACTION, VALUE, KEYS,
     PROJECTION_TYPE, NON_KEY_ATTRIBUTES, COMPARISON_OPERATOR, ATTR_VALUE_LIST,
     TABLE_STATUS, ACTIVE, RETURN_VALUES, BATCH_GET_PAGE_LIMIT, UNPROCESSED_KEYS,
@@ -331,12 +331,14 @@ class Model(AttributeContainer):
                 msg = "{0}<{1}>".format(self.Meta.table_name, serialized.get(HASH))
             return six.u(msg)
 
-    def delete(self, condition=None):
+    def delete(self, condition=None, return_values=False):
         """
         Deletes this object from dynamodb
         """
         args, kwargs = self._get_save_args(attributes=False, null_check=False)
         kwargs.update(condition=condition)
+        if return_values:
+            kwargs[pythonic(RETURN_VALUES)] = ALL_OLD
         return self._get_connection().delete_item(*args, **kwargs)
 
     def update(self, actions=None, condition=None):
