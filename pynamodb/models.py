@@ -147,7 +147,14 @@ class BatchWrite(ModelContextManager):
 
 
 class DefaultMeta(object):
-    pass
+    region = get_settings_value('region')
+    host = get_settings_value('host')
+    session_cls = get_settings_value('session_cls')
+    request_timeout_seconds = get_settings_value('request_timeout_seconds')
+    base_backoff_ms = get_settings_value('base_backoff_ms')
+    max_retry_attempts = get_settings_value('max_retry_attempts')
+    aws_access_key_id = None
+    aws_secret_access_key = None
 
 
 class ResultSet(object):
@@ -174,21 +181,21 @@ class MetaModel(AttributeContainerMeta):
             for attr_name, attr_obj in attrs.items():
                 if attr_name == META_CLASS_NAME:
                     if not hasattr(attr_obj, REGION):
-                        setattr(attr_obj, REGION, get_settings_value('region'))
+                        setattr(attr_obj, REGION, DefaultMeta.region)
                     if not hasattr(attr_obj, HOST):
-                        setattr(attr_obj, HOST, get_settings_value('host'))
+                        setattr(attr_obj, HOST, DefaultMeta.host)
                     if not hasattr(attr_obj, 'session_cls'):
-                        setattr(attr_obj, 'session_cls', get_settings_value('session_cls'))
+                        setattr(attr_obj, 'session_cls', DefaultMeta.session_cls)
                     if not hasattr(attr_obj, 'request_timeout_seconds'):
-                        setattr(attr_obj, 'request_timeout_seconds', get_settings_value('request_timeout_seconds'))
+                        setattr(attr_obj, 'request_timeout_seconds', DefaultMeta.request_timeout_seconds)
                     if not hasattr(attr_obj, 'base_backoff_ms'):
-                        setattr(attr_obj, 'base_backoff_ms', get_settings_value('base_backoff_ms'))
+                        setattr(attr_obj, 'base_backoff_ms', DefaultMeta.base_backoff_ms)
                     if not hasattr(attr_obj, 'max_retry_attempts'):
-                        setattr(attr_obj, 'max_retry_attempts', get_settings_value('max_retry_attempts'))
+                        setattr(attr_obj, 'max_retry_attempts', DefaultMeta.max_retry_attempts)
                     if not hasattr(attr_obj, 'aws_access_key_id'):
-                        setattr(attr_obj, 'aws_access_key_id', None)
+                        setattr(attr_obj, 'aws_access_key_id', DefaultMeta.aws_access_key_id)
                     if not hasattr(attr_obj, 'aws_secret_access_key'):
-                        setattr(attr_obj, 'aws_secret_access_key', None)
+                        setattr(attr_obj, 'aws_secret_access_key', DefaultMeta.aws_secret_access_key)
                 elif issubclass(attr_obj.__class__, (Index, )):
                     attr_obj.Meta.model = cls
                     if not hasattr(attr_obj.Meta, "index_name"):
