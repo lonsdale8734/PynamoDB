@@ -21,7 +21,8 @@ from pynamodb.pagination import ResultIterator
 from pynamodb.settings import get_settings_value
 from pynamodb.constants import (
     ATTR_TYPE_MAP, ATTR_DEFINITIONS, ATTR_NAME, ATTR_TYPE, KEY_SCHEMA,
-    KEY_TYPE, ITEM, ITEMS, READ_CAPACITY_UNITS, WRITE_CAPACITY_UNITS, CAMEL_COUNT,
+    KEY_TYPE, ITEM, ITEMS, BILLING_MODE, PAY_PER_REQUEST,
+    READ_CAPACITY_UNITS, WRITE_CAPACITY_UNITS, CAMEL_COUNT,
     RANGE_KEY, ATTRIBUTES, PUT, DELETE, RESPONSES, QUERY_FILTER_OPERATOR_MAP,
     INDEX_NAME, PROVISIONED_THROUGHPUT, PROJECTION, ATTR_UPDATES, ALL_NEW,
     GLOBAL_SECONDARY_INDEXES, LOCAL_SECONDARY_INDEXES, ACTION, VALUE, KEYS,
@@ -843,16 +844,20 @@ class Model(AttributeContainer):
         return cls._get_connection().describe_table()
 
     @classmethod
-    def create_table(cls, wait=False, read_capacity_units=None, write_capacity_units=None):
+    def create_table(cls, wait=False, billing_mode=None,
+                     read_capacity_units=None, write_capacity_units=None):
         """
         Create the table for this model
 
         :param wait: If set, then this call will block until the table is ready for use
+        :param billing_mode: Controls how you are charged for read and write throughput
         :param read_capacity_units: Sets the read capacity units for this table
         :param write_capacity_units: Sets the write capacity units for this table
         """
         if not cls.exists():
             schema = cls._get_schema()
+            if hasattr(cls.Meta, pythonic(BILLING_MODE)):
+                schema[pythonic(BILLING_MODE)] = cls.Meta.billing_mode
             if hasattr(cls.Meta, pythonic(READ_CAPACITY_UNITS)):
                 schema[pythonic(READ_CAPACITY_UNITS)] = cls.Meta.read_capacity_units
             if hasattr(cls.Meta, pythonic(WRITE_CAPACITY_UNITS)):
@@ -862,6 +867,8 @@ class Model(AttributeContainer):
                     pythonic(STREAM_ENABLED): True,
                     pythonic(STREAM_VIEW_TYPE): cls.Meta.stream_view_type
                 }
+            if billing_mode is not None:
+                schema[pythonic(BILLING_MODE)] = billing_mode
             if read_capacity_units is not None:
                 schema[pythonic(READ_CAPACITY_UNITS)] = read_capacity_units
             if write_capacity_units is not None:
@@ -1151,7 +1158,8 @@ class Model(AttributeContainer):
                     },
 
                 }
-                if issubclass(index.__class__, GlobalSecondaryIndex):
+                if (issubclass(index.__class__, GlobalSecondaryIndex)
+                        and getattr(cls.Meta, pythonic(BILLING_MODE), None) != PAY_PER_REQUEST):
                     idx[pythonic(PROVISIONED_THROUGHPUT)] = {
                         READ_CAPACITY_UNITS: index.Meta.read_capacity_units,
                         WRITE_CAPACITY_UNITS: index.Meta.write_capacity_units

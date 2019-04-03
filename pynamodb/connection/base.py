@@ -35,7 +35,7 @@ from pynamodb.constants import (
     WRITE_CAPACITY_UNITS, GLOBAL_SECONDARY_INDEXES, PROJECTION, EXCLUSIVE_START_TABLE_NAME, TOTAL,
     DELETE_TABLE, UPDATE_TABLE, LIST_TABLES, GLOBAL_SECONDARY_INDEX_UPDATES, ATTRIBUTES,
     CONSUMED_CAPACITY, CAPACITY_UNITS, QUERY_FILTER, QUERY_FILTER_VALUES, CONDITIONAL_OPERATOR,
-    CONDITIONAL_OPERATORS, NULL, NOT_NULL, SHORT_ATTR_TYPES, DELETE, PUT,
+    CONDITIONAL_OPERATORS, NULL, NOT_NULL, SHORT_ATTR_TYPES, DELETE, PUT, BILLING_MODE, PAY_PER_REQUEST,
     ITEMS, DEFAULT_ENCODING, BINARY_SHORT, BINARY_SET_SHORT, LAST_EVALUATED_KEY, RESPONSES, UNPROCESSED_KEYS,
     UNPROCESSED_ITEMS, STREAM_SPECIFICATION, STREAM_VIEW_TYPE, STREAM_ENABLED, UPDATE_EXPRESSION,
     EXPRESSION_ATTRIBUTE_NAMES, EXPRESSION_ATTRIBUTE_VALUES, KEY_CONDITION_OPERATOR_MAP,
@@ -516,6 +516,7 @@ class Connection(object):
                      table_name,
                      attribute_definitions=None,
                      key_schema=None,
+                     billing_mode=None,
                      read_capacity_units=None,
                      write_capacity_units=None,
                      global_secondary_indexes=None,
@@ -526,11 +527,16 @@ class Connection(object):
         """
         operation_kwargs = {
             TABLE_NAME: table_name,
-            PROVISIONED_THROUGHPUT: {
+        }
+
+        if billing_mode == PAY_PER_REQUEST:
+            operation_kwargs[BILLING_MODE] = PAY_PER_REQUEST
+        else:
+            operation_kwargs[PROVISIONED_THROUGHPUT] = {
                 READ_CAPACITY_UNITS: read_capacity_units,
                 WRITE_CAPACITY_UNITS: write_capacity_units
             }
-        }
+
         attrs_list = []
         if attribute_definitions is None:
             raise ValueError("attribute_definitions argument is required")
@@ -544,12 +550,14 @@ class Connection(object):
         if global_secondary_indexes:
             global_secondary_indexes_list = []
             for index in global_secondary_indexes:
-                global_secondary_indexes_list.append({
+                tmp_index = {
                     INDEX_NAME: index.get(pythonic(INDEX_NAME)),
                     KEY_SCHEMA: sorted(index.get(pythonic(KEY_SCHEMA)), key=lambda x: x.get(KEY_TYPE)),
-                    PROJECTION: index.get(pythonic(PROJECTION)),
-                    PROVISIONED_THROUGHPUT: index.get(pythonic(PROVISIONED_THROUGHPUT))
-                })
+                    PROJECTION: index.get(pythonic(PROJECTION))
+                }
+                if billing_mode != PAY_PER_REQUEST:
+                    tmp_index[PROVISIONED_THROUGHPUT] = index.get(pythonic(PROVISIONED_THROUGHPUT))
+                global_secondary_indexes_list.append(tmp_index)
             operation_kwargs[GLOBAL_SECONDARY_INDEXES] = global_secondary_indexes_list
 
         if key_schema is None:
@@ -599,6 +607,7 @@ class Connection(object):
 
     def update_table(self,
                      table_name,
+                     billing_mode=None,
                      read_capacity_units=None,
                      write_capacity_units=None,
                      global_secondary_index_updates=None):
@@ -608,25 +617,29 @@ class Connection(object):
         operation_kwargs = {
             TABLE_NAME: table_name
         }
-        if read_capacity_units and not write_capacity_units or write_capacity_units and not read_capacity_units:
-            raise ValueError("read_capacity_units and write_capacity_units are required together")
-        if read_capacity_units and write_capacity_units:
-            operation_kwargs[PROVISIONED_THROUGHPUT] = {
-                READ_CAPACITY_UNITS: read_capacity_units,
-                WRITE_CAPACITY_UNITS: write_capacity_units
-            }
+        if billing_mode == PAY_PER_REQUEST:
+            operation_kwargs[BILLING_MODE] = PAY_PER_REQUEST
+        else:
+            if read_capacity_units and not write_capacity_units or write_capacity_units and not read_capacity_units:
+                raise ValueError("read_capacity_units and write_capacity_units are required together")
+            if read_capacity_units and write_capacity_units:
+                operation_kwargs[PROVISIONED_THROUGHPUT] = {
+                    READ_CAPACITY_UNITS: read_capacity_units,
+                    WRITE_CAPACITY_UNITS: write_capacity_units
+                }
+        
         if global_secondary_index_updates:
             global_secondary_indexes_list = []
             for index in global_secondary_index_updates:
-                global_secondary_indexes_list.append({
-                    UPDATE: {
-                        INDEX_NAME: index.get(pythonic(INDEX_NAME)),
-                        PROVISIONED_THROUGHPUT: {
-                            READ_CAPACITY_UNITS: index.get(pythonic(READ_CAPACITY_UNITS)),
-                            WRITE_CAPACITY_UNITS: index.get(pythonic(WRITE_CAPACITY_UNITS))
-                        }
-                    }
-                })
+                update_data = {
+                    INDEX_NAME: index.get(pythonic(INDEX_NAME)),
+                }
+                if billing_mode != PAY_PER_REQUEST:
+                    update_data[PROVISIONED_THROUGHPUT] = {
+                        READ_CAPACITY_UNITS: index.get(pythonic(READ_CAPACITY_UNITS)),
+                        WRITE_CAPACITY_UNITS: index.get(pythonic(WRITE_CAPACITY_UNITS))
+                    } 
+                global_secondary_indexes_list.append({UPDATE: update_data})
             operation_kwargs[GLOBAL_SECONDARY_INDEX_UPDATES] = global_secondary_indexes_list
         try:
             return self.dispatch(UPDATE_TABLE, operation_kwargs)

@@ -83,6 +83,7 @@ HTTP_OK = 200
 HTTP_BAD_REQUEST = 400
 
 # Create Table arguments
+BILLING_MODE = 'BillingMode'
 PROVISIONED_THROUGHPUT = 'ProvisionedThroughput'
 READ_CAPACITY_UNITS = 'ReadCapacityUnits'
 WRITE_CAPACITY_UNITS = 'WriteCapacityUnits'
@@ -128,6 +129,11 @@ ATTR_TYPE_MAP = {
     BOOLEAN: BOOLEAN_SHORT,
     NULL: NULL_SHORT,
 }
+
+# Constants needed for billing mode
+PROVISIONED = 'PROVISIONED'
+PAY_PER_REQUEST = 'PAY_PER_REQUEST'
+
 # Constants needed for creating indexes
 LOCAL_SECONDARY_INDEX = 'LocalSecondaryIndex'
 LOCAL_SECONDARY_INDEXES = 'LocalSecondaryIndexes'
