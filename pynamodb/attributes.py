@@ -242,6 +242,22 @@ class AttributeContainer(object):
         """
         return cls._attributes
 
+    def to_dict(self):
+        def parse_map(data):
+            if isinstance(data, AttributeContainer):
+                result = {}
+                for key, value in data.attribute_values.items():
+                    if isinstance(value, list):
+                        result[key] = [parse_map(item) for item in value]
+                    elif isinstance(value, MapAttribute):
+                        result[key] = parse_map(value)
+                    else:
+                        result[key] = value
+            else:
+                result = data
+            return result
+        return parse_map(self)
+
     @classmethod
     def _dynamo_to_python_attr(cls, dynamo_key):
         """
