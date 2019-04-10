@@ -397,6 +397,8 @@ class Model(AttributeContainer):
 
         :param hash_key: The hash key of the desired item
         :param range_key: The range key of the desired item, only used when appropriate.
+        :param consistent_read: If True, a consistent read is performed
+        :param attributes_to_get: If set, only returns these elements
         """
         hash_key, range_key = cls._serialize_keys(hash_key, range_key)
         data = cls._get_connection().get_item(
