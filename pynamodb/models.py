@@ -331,15 +331,15 @@ class Model(AttributeContainer):
                 msg = "{0}<{1}>".format(self.Meta.table_name, serialized.get(HASH))
             return six.u(msg)
 
-    def delete(self, condition=None, return_values=False):
+    def delete(self, condition=None):
         """
         Deletes this object from dynamodb
         """
         args, kwargs = self._get_save_args(attributes=False, null_check=False)
         kwargs.update(condition=condition)
-        if return_values:
-            kwargs[pythonic(RETURN_VALUES)] = ALL_OLD
-        return self._get_connection().delete_item(*args, **kwargs)
+        kwargs[pythonic(RETURN_VALUES)] = ALL_OLD
+        data = self._get_connection().delete_item(*args, **kwargs)
+        return self.__class__.from_raw_data(data[ATTRIBUTES])
 
     def update(self, actions=None, condition=None):
         """
@@ -356,18 +356,25 @@ class Model(AttributeContainer):
         if pythonic(RANGE_KEY) in save_kwargs:
             kwargs[pythonic(RANGE_KEY)] = save_kwargs[pythonic(RANGE_KEY)]
 
+        if condition is None:
+            condition = self._hash_key_attribute().exists()
+        else:
+            condition = self._hash_key_attribute().exists() & condition
+
         kwargs.update(condition=condition)
         kwargs.update(actions=actions)
         data = self._get_connection().update_item(*args, **kwargs)
         return self.__class__.from_raw_data(data[ATTRIBUTES])
 
-    def save(self, condition=None):
+    def insert(self):
         """
-        Save this object to dynamodb
+        Create this object to dynamodb
         """
         args, kwargs = self._get_save_args()
+        condition = self._hash_key_attribute().does_not_exist()
         kwargs.update(condition=condition)
-        return self._get_connection().put_item(*args, **kwargs)
+        self._get_connection().put_item(*args, **kwargs)
+        return self
 
     def refresh(self, consistent_read=False):
         """
