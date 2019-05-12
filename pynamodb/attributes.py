@@ -309,6 +309,9 @@ class SetMixin(object):
         """
         Deserializes a set
         """
+        if value is None:
+            return None
+        
         if value and len(value):
             return set([json.loads(val) for val in value])
 
@@ -323,12 +326,17 @@ class BinaryAttribute(Attribute):
         """
         Returns a base64 encoded binary string
         """
+        if value is None:
+            return None
         return b64encode(value).decode(DEFAULT_ENCODING)
 
     def deserialize(self, value):
         """
         Returns a decoded string from base64
         """
+        if value is None:
+            return None
+        
         try:
             return b64decode(value.decode(DEFAULT_ENCODING))
         except AttributeError:
@@ -346,6 +354,9 @@ class BinarySetAttribute(SetMixin, Attribute):
         """
         Returns a base64 encoded binary string
         """
+        if value is None:
+            return None
+        
         if value and len(value):
             return [b64encode(val).decode(DEFAULT_ENCODING) for val in sorted(value)]
         else:
@@ -355,6 +366,9 @@ class BinarySetAttribute(SetMixin, Attribute):
         """
         Returns a decoded string from base64
         """
+        if value is None:
+            return None
+        
         try:
             if value and len(value):
                 return set([b64decode(val.decode(DEFAULT_ENCODING)) for val in value])
@@ -394,6 +408,9 @@ class UnicodeSetAttribute(SetMixin, Attribute):
         return None
 
     def deserialize(self, value):
+        if value is None:
+            return None
+        
         if value and len(value):
             return set([self.element_deserialize(val) for val in value])
 
@@ -430,6 +447,7 @@ class JSONAttribute(Attribute):
         """
         if value is None:
             return None
+        
         encoded = json.dumps(value, ensure_ascii=False)
         try:
             return unicode(encoded)
@@ -440,6 +458,8 @@ class JSONAttribute(Attribute):
         """
         Deserializes JSON
         """
+        if value is None:
+            return None
         return json.loads(value, strict=False)
 
 
@@ -462,6 +482,8 @@ class LegacyBooleanAttribute(Attribute):
             return json.dumps(0)
 
     def deserialize(self, value):
+        if value is None:
+            return None
         return bool(json.loads(value))
 
     def get_value(self, value):
@@ -491,6 +513,8 @@ class BooleanAttribute(Attribute):
             return False
 
     def deserialize(self, value):
+        if value is None:
+            return None
         return bool(value)
 
     def get_value(self, value):
@@ -520,12 +544,16 @@ class NumberAttribute(Attribute):
         """
         Encode numbers as JSON
         """
+        if value is None:
+            return None
         return json.dumps(value)
 
     def deserialize(self, value):
         """
         Decode numbers from JSON
         """
+        if value is None:
+            return None
         return json.loads(value)
 
 
@@ -551,6 +579,9 @@ class UTCDateTimeAttribute(Attribute):
         """
         Takes a datetime object and returns a string
         """
+        if value is None:
+            return None
+        
         if value.tzinfo is None:
             value = value.replace(tzinfo=tzutc())
         fmt = value.astimezone(tzutc()).strftime(DATETIME_FORMAT)
@@ -563,6 +594,9 @@ class UTCDateTimeAttribute(Attribute):
         # First attempt to parse the datetime with the datetime format used
         # by default when storing UTCDateTimeAttributes.  This is signifantly
         # faster than always going through dateutil.
+        if value is None:
+            return None
+        
         try:
             return datetime.strptime(value, DATETIME_FORMAT)
         except ValueError:
@@ -954,6 +988,9 @@ class EnumAttribute(UnicodeAttribute):
         self.enum: Type[Enum] = of
 
     def serialize(self, value):
+        if value is None:
+            return None
+        
         if not isinstance(value, self.enum):
             raise ValueError('{} must be instance of {}, not "{}"'.format(self.attr_name, self.enum, value))
 
@@ -962,6 +999,7 @@ class EnumAttribute(UnicodeAttribute):
     def deserialize(self, value):
         if value is None:
             return None
+        
         value = super(EnumAttribute, self).deserialize(value)
         return self.enum(value)
 
@@ -980,6 +1018,9 @@ class DatetimeAttribute(Attribute):
         self.tz_info = tz_info or DatetimeAttribute._tz_utc8
 
     def serialize(self, value):
+        if value is None:
+            return None
+        
         if not isinstance(value, datetime):
             raise ValueError('{} must be {}'.format(self.attr_name, datetime.__name__))
 
@@ -990,6 +1031,8 @@ class DatetimeAttribute(Attribute):
         return six.u(fmt)
 
     def deserialize(self, value):
+        if value is None:
+            return None
         return datetime.strptime(value, self.format).replace(tzinfo=self.tz_info)
 
 
@@ -1015,28 +1058,29 @@ class CompositeAttribute(Attribute):
         self.separator = separator
 
     def serialize(self, value):
+        if value is None:
+            return None
+        
         assert len(value) == len(self.element_type)
+        
         values = []
         for attr, data in zip(self.element_type, value):
-            if data is None and attr.null:
-                tmp = None
-            else:
-                tmp = attr.serialize(data)
-                
+            tmp = None if data is None else attr.serialize(data)
             if tmp is None:
                 tmp = ''  # one-to-one correspondence
             values.append(tmp)
+            
         return self.separator.join(values)
 
     def deserialize(self, value):
+        if value is None:
+            return None
+        
         values = value.split(self.separator)
         
         elements = []
         for attr, data in zip(self.element_type, values):
-            if data == '' and attr.null:
-                elements.append(None)
-            else:
-                elements.append(attr.deserialize(data))
+            elements.append(None if data == '' else attr.deserialize(data))
                 
         return tuple(elements)
 
